@@ -54,6 +54,8 @@ public:
 
 		Ref<Texture2D> icon = Ref<Texture2D>();
 		bool editable = true;
+		String path = "";
+		bool is_group = false;
 	};
 
 private:
@@ -90,6 +92,10 @@ private:
 	LineEdit *add_edit = nullptr;
 	Button *add_button = nullptr;
 
+	HBoxContainer *add_group_hbox = nullptr;
+	LineEdit *add_group_edit = nullptr;
+	Button *add_group_button = nullptr;
+
 	void _event_config_confirmed();
 
 	void _add_action_pressed();
@@ -98,6 +104,10 @@ private:
 	bool _has_action(const String &p_name) const;
 	void _add_action(const String &p_name);
 	void _action_edited();
+
+	void _add_action_group_pressed();
+	void _add_group_edit_text_changed(const String &p_name);
+	void _add_action_group(const String &p_name);
 
 	void _tree_button_pressed(Object *p_item, int p_column, int p_id, MouseButton p_button);
 	void _tree_item_activated();

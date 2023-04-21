@@ -494,12 +494,33 @@ void ProjectSettingsEditor::_action_reordered(const String &p_action_name, const
 	undo_redo->commit_action();
 }
 
+void ProjectSettingsEditor::_action_group_added(const String &p_name) {
+	String name = "input/" + p_name;
+
+	ERR_FAIL_COND_MSG(ProjectSettings::get_singleton()->has_setting(name),
+			"An action with this name already exists.");
+
+	Dictionary action;
+	action["actions"] = Array();
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Add Input Action Group"));
+	undo_redo->add_do_method(ProjectSettings::get_singleton(), "set", name, action);
+	undo_redo->add_undo_method(ProjectSettings::get_singleton(), "clear", name);
+
+	undo_redo->add_do_method(this, "_update_action_map_editor");
+	undo_redo->add_undo_method(this, "_update_action_map_editor");
+	undo_redo->add_do_method(this, "queue_save");
+	undo_redo->add_undo_method(this, "queue_save");
+	undo_redo->commit_action();
+}
+
 void ProjectSettingsEditor::_update_action_map_editor() {
 	Vector<ActionMapEditor::ActionInfo> actions;
 
 	List<PropertyInfo> props;
 	ProjectSettings::get_singleton()->get_property_list(&props);
 
+	const Ref<Texture2D> group_icon = get_theme_icon(SNAME("Folder"), SNAME("EditorIcons"));
 	const Ref<Texture2D> builtin_icon = get_theme_icon(SNAME("PinPressed"), SNAME("EditorIcons"));
 	for (const PropertyInfo &E : props) {
 		const String property_name = E.name;
@@ -516,6 +537,10 @@ void ProjectSettingsEditor::_update_action_map_editor() {
 		action_info.action = action;
 		action_info.editable = true;
 		action_info.name = display_name;
+		action_info.is_group = !action.has("events");
+		if (action_info.is_group) {
+			action_info.icon = group_icon;
+		}
 
 		const bool is_builtin_input = ProjectSettings::get_singleton()->get_input_presets().find(property_name) != nullptr;
 		if (is_builtin_input) {
@@ -690,6 +715,7 @@ ProjectSettingsEditor::ProjectSettingsEditor(EditorData *p_data) {
 	action_map_editor->connect("action_reordered", callable_mp(this, &ProjectSettingsEditor::_action_reordered));
 	action_map_editor->connect(SNAME("filter_focused"), callable_mp(this, &ProjectSettingsEditor::_input_filter_focused));
 	action_map_editor->connect(SNAME("filter_unfocused"), callable_mp(this, &ProjectSettingsEditor::_input_filter_unfocused));
+	action_map_editor->connect("action_group_added", callable_mp(this, &ProjectSettingsEditor::_action_group_added));
 	tab_container->add_child(action_map_editor);
 
 	localization_editor = memnew(LocalizationEditor);

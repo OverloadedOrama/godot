@@ -148,6 +148,27 @@ void ActionMapEditor::_action_edited() {
 	}
 }
 
+void ActionMapEditor::_add_action_group_pressed() {
+	_add_action_group(add_group_edit->get_text());
+}
+
+void ActionMapEditor::_add_group_edit_text_changed(const String &p_name) {
+	String error = _check_new_action_name(p_name);
+	add_group_button->set_tooltip_text(error);
+	add_group_button->set_disabled(!error.is_empty());
+}
+
+void ActionMapEditor::_add_action_group(const String &p_name) {
+	String error = _check_new_action_name(p_name);
+	if (!error.is_empty()) {
+		show_message(error);
+		return;
+	}
+
+	add_group_edit->clear();
+	emit_signal(SNAME("action_group_added"), p_name);
+}
+
 void ActionMapEditor::_tree_button_pressed(Object *p_item, int p_column, int p_id, MouseButton p_button) {
 	if (p_button != MouseButton::LEFT) {
 		return;
@@ -263,7 +284,11 @@ Variant ActionMapEditor::get_drag_data_fw(const Point2 &p_point, Control *p_from
 		drag_data["input_type"] = "event";
 	}
 
-	action_tree->set_drop_mode_flags(Tree::DROP_MODE_INBETWEEN);
+	if (selected->has_meta("__is_group")) {
+		drag_data["is_group"] = selected->get_meta("__is_group");
+	}
+
+	action_tree->set_drop_mode_flags(Tree::DROP_MODE_ON_ITEM + Tree::DROP_MODE_INBETWEEN);
 
 	return drag_data;
 }
@@ -308,10 +333,15 @@ void ActionMapEditor::drop_data_fw(const Point2 &p_point, const Variant &p_data,
 
 	Dictionary d = p_data;
 	if (d["input_type"] == "action") {
-		// Change action order.
-		String relative_to = target->get_meta("__name");
-		String action_name = selected->get_meta("__name");
-		emit_signal(SNAME("action_reordered"), action_name, relative_to, drop_above);
+		//if (target->has_meta("__is_group") && target->get_meta("__is_group")) {
+		//	emit_signal(SNAME("action_regrouped"), action_name, group_name);
+		//}
+		//else {
+			// Change action order.
+			String relative_to = target->get_meta("__name");
+			String action_name = selected->get_meta("__name");
+			emit_signal(SNAME("action_reordered"), action_name, relative_to, drop_above);
+		//}
 
 	} else if (d["input_type"] == "event") {
 		// Change event order
@@ -369,6 +399,7 @@ void ActionMapEditor::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("action_reordered", PropertyInfo(Variant::STRING, "action_name"), PropertyInfo(Variant::STRING, "relative_to"), PropertyInfo(Variant::BOOL, "before")));
 	ADD_SIGNAL(MethodInfo(SNAME("filter_focused")));
 	ADD_SIGNAL(MethodInfo(SNAME("filter_unfocused")));
+	ADD_SIGNAL(MethodInfo("action_group_added", PropertyInfo(Variant::STRING, "name")));
 }
 
 LineEdit *ActionMapEditor::get_search_box() const {
@@ -402,6 +433,7 @@ void ActionMapEditor::update_action_list(const Vector<ActionInfo> &p_action_info
 
 	action_tree->clear();
 	TreeItem *root = action_tree->create_item();
+	Dictionary created_groups = {};
 
 	for (int i = 0; i < actions_cache.size(); i++) {
 		ActionInfo action_info = actions_cache[i];
@@ -417,22 +449,41 @@ void ActionMapEditor::update_action_list(const Vector<ActionInfo> &p_action_info
 
 		const Variant deadzone = action_info.action["deadzone"];
 
+		TreeItem *parent_item = root;
+		String action_path = action_info.path;
+		if (action_path != "") {
+			if (created_groups.has(action_path)) {
+				parent_item = created_groups[action_path];
+			}
+			else {
+				parent_item = action_tree->create_item(root);
+				created_groups[action_path] = parent_item;
+			}
+		}
 		// Update Tree...
-
-		TreeItem *action_item = action_tree->create_item(root);
+		TreeItem *action_item = action_tree->create_item(parent_item);
 		action_item->set_meta("__action", action_info.action);
 		action_item->set_meta("__name", action_info.name);
+		action_item->set_meta("__is_group", action_info.is_group);
 
 		// First Column - Action Name
 		action_item->set_text(0, action_info.name);
 		action_item->set_editable(0, action_info.editable);
 		action_item->set_icon(0, action_info.icon);
 
+		action_item->set_custom_bg_color(0, action_tree->get_theme_color(SNAME("prop_subsection"), SNAME("Editor")));
+
+		if (action_info.is_group) {
+			action_item->add_button(2, action_tree->get_theme_icon(SNAME("Remove"), SNAME("EditorIcons")), BUTTON_REMOVE_ACTION, !action_info.editable, action_info.editable ? TTR("Remove Action Group") : TTR("Cannot Remove Action Group"));
+			continue;
+		}
+
 		// Second Column - Deadzone
 		action_item->set_editable(1, true);
 		action_item->set_cell_mode(1, TreeItem::CELL_MODE_RANGE);
 		action_item->set_range_config(1, 0.0, 1.0, 0.01);
 		action_item->set_range(1, deadzone);
+		action_item->set_custom_bg_color(1, action_tree->get_theme_color(SNAME("prop_subsection"), SNAME("Editor")));
 
 		// Third column - buttons
 		if (action_info.has_initial) {
@@ -444,9 +495,6 @@ void ActionMapEditor::update_action_list(const Vector<ActionInfo> &p_action_info
 		}
 		action_item->add_button(2, action_tree->get_theme_icon(SNAME("Add"), SNAME("EditorIcons")), BUTTON_ADD_EVENT, false, TTR("Add Event"));
 		action_item->add_button(2, action_tree->get_theme_icon(SNAME("Remove"), SNAME("EditorIcons")), BUTTON_REMOVE_ACTION, !action_info.editable, action_info.editable ? TTR("Remove Action") : TTR("Cannot Remove Action"));
-
-		action_item->set_custom_bg_color(0, action_tree->get_theme_color(SNAME("prop_subsection"), SNAME("Editor")));
-		action_item->set_custom_bg_color(1, action_tree->get_theme_color(SNAME("prop_subsection"), SNAME("Editor")));
 
 		for (int evnt_idx = 0; evnt_idx < events.size(); evnt_idx++) {
 			Ref<InputEvent> event = events[evnt_idx];
@@ -574,6 +622,27 @@ ActionMapEditor::ActionMapEditor() {
 	add_hbox->add_child(show_builtin_actions_checkbutton);
 
 	main_vbox->add_child(add_hbox);
+
+	// Adding group LineEdit + Button
+	add_group_hbox = memnew(HBoxContainer);
+	add_group_hbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+
+	add_group_edit = memnew(LineEdit);
+	add_group_edit->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	add_group_edit->set_placeholder(TTR("Add New Action Group"));
+	add_group_edit->set_clear_button_enabled(true);
+	add_group_edit->connect("text_changed", callable_mp(this, &ActionMapEditor::_add_group_edit_text_changed));
+	add_group_edit->connect("text_submitted", callable_mp(this, &ActionMapEditor::_add_action_group));
+	add_group_hbox->add_child(add_group_edit);
+
+	add_group_button = memnew(Button);
+	add_group_button->set_text(TTR("Add"));
+	add_group_button->connect("pressed", callable_mp(this, &ActionMapEditor::_add_action_group_pressed));
+	add_group_hbox->add_child(add_group_button);
+	// Disable the button and set its tooltip.
+	_add_group_edit_text_changed(add_group_edit->get_text());
+
+	main_vbox->add_child(add_group_hbox);
 
 	// Action Editor Tree
 	action_tree = memnew(Tree);
