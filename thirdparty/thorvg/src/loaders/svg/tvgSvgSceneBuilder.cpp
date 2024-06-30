@@ -360,6 +360,7 @@ static void _applyProperty(SvgLoaderData& loaderData, SvgNode* node, Shape* vg, 
     vg->stroke(style->stroke.cap);
     vg->stroke(style->stroke.join);
     vg->strokeMiterlimit(style->stroke.miterlimit);
+    vg->shapeRendering(style->stroke.antiAlias);
     if (style->stroke.dash.array.count > 0) {
         P(vg)->strokeDash(style->stroke.dash.array.data, style->stroke.dash.array.count, style->stroke.dash.offset);
     }

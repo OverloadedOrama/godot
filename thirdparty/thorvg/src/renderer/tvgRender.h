@@ -136,6 +136,7 @@ struct RenderStroke
     float dashOffset = 0.0f;
     StrokeCap cap = StrokeCap::Square;
     StrokeJoin join = StrokeJoin::Bevel;
+    ShapeRendering antiAlias = ShapeRendering::AntiAliased;
     float miterlimit = 4.0f;
     bool strokeFirst = false;
 

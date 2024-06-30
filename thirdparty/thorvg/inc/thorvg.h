@@ -146,6 +146,14 @@ enum class FillRule
     EvenOdd      ///< A line from the point to a location outside the shape is drawn and its intersections with the path segments of the shape are counted. If the number of intersections is an odd number, the point is inside the shape.
 };
 
+/**
+ * @brief Enumeration specifying whether the shape is anti-aliased or not.
+ */
+enum class ShapeRendering
+{
+    AntiAliased = 0, ///< Antialiased
+    CrispEdges      ///< No AA
+};
 
 /**
  * @brief Enumeration indicating the method used in the composition of two objects - the target and the source.
@@ -1024,6 +1032,17 @@ public:
     Result fill(FillRule r) noexcept;
 
     /**
+     * @brief Sets the join style for stroked path segments.
+     *
+     * The join style is used for joining the two line segment while stroking the path.
+     *
+     * @param[in] join The join style value. The default value is @c StrokeJoin::Bevel.
+     *
+     * @retval Result::Success when succeed.
+     */
+    Result shapeRendering(ShapeRendering sr) noexcept;
+
+    /**
      * @brief Sets the rendering order of the stroke and the fill.
      *
      * @param[in] strokeFirst If @c true the stroke is rendered before the fill, otherwise the stroke is rendered as the second one (the default option).
@@ -1075,6 +1094,13 @@ public:
      * @return The fill rule value of the shape.
      */
     FillRule fillRule() const noexcept;
+
+    /**
+     * @brief Gets the fill rule value.
+     *
+     * @return The fill rule value of the shape.
+     */
+    ShapeRendering shapeRendering() const noexcept;
 
     /**
      * @brief Gets the stroke width.
